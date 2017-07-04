@@ -1,0 +1,59 @@
+module czechlight-optical-channels {
+
+  namespace
+    "http://czechlight.cesnet.cz/netconf/optical-channels";
+
+  prefix "czechlight-optical-channels";
+
+  organization "CESNET";
+  contact "photonic@cesnet.cz";
+  description "Definitions of DWDM channels";
+
+  revision 2017-07-04 {
+    description "Channel frequencies are back in THz";
+  }
+
+  revision 2017-05-23 {
+    description "HACK: pass frequency in GHz";
+  }
+
+  revision 2017-05-02 {
+    description "Initial release";
+  }
+
+  grouping optical-channel {
+    description "An optical channel refers to a chunk of spectrum";
+
+    leaf center-frequency {
+      type decimal64 {
+        fraction-digits 3;
+        range "190.100..197.200";
+      }
+      units "THz";
+      mandatory true;
+      description "Frequency of the central point of the bandwidth range";
+    }
+
+    leaf channel-width {
+      type decimal64 {
+        fraction-digits 1;
+        range "12.5..max";
+      }
+      units "GHz";
+      mandatory true;
+      description "Total width of the optical channel";
+    }
+
+    leaf approximate-wavelength {
+      type decimal64 {
+        fraction-digits 2;
+      }
+      units "nm";
+      config false;
+      mandatory true;
+      description "Approximate wavelength that corresponds to the central frequency.
+      This is only for information; it is a computed value.";
+    }
+  }
+
+}
