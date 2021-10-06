@@ -1,0 +1,134 @@
+module czechlight-network {
+    yang-version 1.1;
+    namespace "http://czechlight.cesnet.cz/yang/czechlight-network";
+    prefix cla-network;
+
+    import ietf-interfaces {
+        prefix if;
+    }
+
+    import ietf-routing {
+        prefix rt;
+    }
+
+    import ietf-ip {
+        prefix ip;
+    }
+
+    import iana-if-type {
+        prefix ianaift;
+    }
+
+    import ietf-ipv6-unicast-routing {
+        prefix v6ur;
+    }
+
+    revision 2021-02-22 {
+        description
+            "Initial version. Removes interface statistics in ietf-interfaces model, removes deprecated container
+             ietf-interfaces:interface-state and makes the nodes in ietf-interfaces model config false.";
+    }
+
+    // We don't support discontinuity time (yet)
+    deviation /if:interfaces/if:interface/if:statistics/if:discontinuity-time { deviate not-supported; }
+
+    // IPv6 router advertisements is not supported
+    deviation /if:interfaces/if:interface/ip:ipv6/v6ur:ipv6-router-advertisements { deviate not-supported; }
+
+    // Remove deprecated ietf-interfaces-state and ietf-routing containers. Beware, rt:routing-state references if:interfaces-state.
+    deviation /rt:routing-state { deviate not-supported; }
+    deviation /if:interfaces-state { deviate not-supported; }
+
+    // As of now we implement the ietf-routing model to contain operational data only
+    deviation /rt:routing { deviate add { config false; } }
+
+    // We do not support configuring some parts of if:interfaces tree
+    deviation /if:interfaces/if:interface/ip:ipv4/ip:forwarding { deviate add { config false; } }
+    deviation /if:interfaces/if:interface/ip:ipv4/ip:mtu { deviate add { config false; } }
+    deviation /if:interfaces/if:interface/ip:ipv4/ip:neighbor { deviate add { config false; } }
+    deviation /if:interfaces/if:interface/ip:ipv6/ip:forwarding { deviate add { config false; } }
+    deviation /if:interfaces/if:interface/ip:ipv6/ip:mtu { deviate add { config false; } }
+    deviation /if:interfaces/if:interface/ip:ipv6/ip:neighbor { deviate add { config false; } }
+    deviation /if:interfaces/if:interface/ip:ipv6/ip:dup-addr-detect-transmits { deviate add { config false; } }
+
+    // User should not create new links or reconfigure link types
+    deviation /if:interfaces/if:interface/if:name {
+        deviate add {
+            must '. = "br0" or . = "eth0" or . = "eth1" or . = "osc" or . = "oscW" or . = "oscE"' {
+                error-message "Link name must be chosen from the following options: {br0, eth0, eth1, osc, oscW, oscE}.";
+            }
+        }
+    }
+
+    deviation /if:interfaces/if:interface/if:type {
+        deviate add {
+            must '(../if:name = "br0" and . = "ianaift:bridge") or
+                  (../if:name = "eth0" and . = "ianaift:ethernetCsmacd") or
+                  (../if:name = "eth1" and . = "ianaift:ethernetCsmacd") or
+                  (../if:name = "osc" and . = "ianaift:ethernetCsmacd") or
+                  (../if:name = "oscW" and . = "ianaift:ethernetCsmacd") or
+                  (../if:name = "oscE" and . = "ianaift:ethernetCsmacd")' {
+                error-message "Link type can't be reconfigured.";
+            }
+        }
+    }
+
+    augment /if:interfaces/if:interface {
+        description "Add the option to add this link to a bridge.";
+
+        leaf bridge {
+            must '. = "br0"' {
+                error-message "br0 is the only available bridge interface.";
+            }
+
+            when '(not(../ip:ipv4) or ../ip:ipv4/ip:enabled[.="false"]) and
+                  (not(../ip:ipv6) or ../ip:ipv6/ip:enabled[.="false"])' {
+                description "IP protocols must be disabled for enslaved link.";
+            }
+
+            type if:interface-ref;
+            mandatory false;
+            description "The name of the bridge to add the link to.";
+        }
+    }
+
+    // Make it hard to accidentally lose connection by removing ipv4/ipv6 presence containers or all IP addresses
+    deviation /if:interfaces/if:interface {
+        deviate add {
+            must 'if:enabled = "false" or
+                  ip:ipv4/ip:enabled = "true" or
+                  ip:ipv6/ip:enabled = "true" or
+                  cla-network:bridge' {
+                error-message "There must always be at least one protocol active unless the interface is disabled.";
+            }
+		}
+	}
+
+    deviation /if:interfaces/if:interface/ip:ipv4 {
+        deviate add {
+            must 'ip:enabled = "false" or count(ip:address) > 0' {
+                error-message "There must always be at least one IPv4 address unless the protocol is disabled.";
+            }
+        }
+    }
+
+    deviation /if:interfaces/if:interface/ip:ipv6 {
+        deviate add {
+            must 'ip:enabled = "false" or count(ip:address) > 0' {
+                error-message "There must always be at least one IPv6 address unless the protocol is disabled.";
+            }
+        }
+    }
+
+    // IPv6 address autoconfiguration is not supported
+    deviation /if:interfaces/if:interface/ip:ipv6/ip:autoconf { deviate not-supported; }
+
+    identity dhcp {
+        base rt:routing-protocol;
+        description "Identity for route installed by DHCP.";
+    }
+    identity ra {
+        base rt:routing-protocol;
+        description "Identity for route installed by router advertisement.";
+    }
+}

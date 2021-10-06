@@ -1,0 +1,251 @@
+module czechlight-system {
+  yang-version 1.1;
+  namespace
+    "http://czechlight.cesnet.cz/yang/czechlight-system";
+
+  prefix "cla-sys";
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  import ietf-netconf-acm {
+    prefix nacm;
+  }
+
+  import ietf-system {
+    prefix "sys";
+  }
+
+  organization "CESNET";
+  contact "photonic@cesnet.cz";
+  description
+    "YANG model for system administration in Czechlight devices.";
+
+  revision 2021-01-13 {
+    description "Initial release";
+  }
+
+  typedef percent {
+    type uint8 {
+      range "0 .. 100";
+    }
+  }
+
+  container firmware {
+    config false;
+
+    list firmware-slot {
+      key name;
+
+      leaf name {
+        description "Identifier of the slot.";
+        type string;
+      }
+
+      leaf version {
+        description "Firmware version installed in the slot.";
+        type string;
+      }
+
+      leaf installed {
+        description "Datetime of the last installation performed in this slot.";
+        type yang:date-and-time;
+      }
+
+      leaf state {
+        description "Current state of the slot.";
+        type enumeration {
+          enum inactive;
+          enum booted;
+        }
+      }
+
+      leaf boot-status {
+        description "Boot status.";
+        type enumeration {
+          enum good;
+          enum bad;
+        }
+      }
+    }
+
+    container installation {
+      leaf status {
+        description "Informs about the status of the current (or last) installation.";
+
+        type enumeration {
+          enum none;
+          enum in-progress;
+          enum succeeded;
+          enum failed;
+        }
+      }
+
+      leaf message {
+        description "The last message from the installation process. This MAY contain the last error message.";
+        type string;
+      }
+
+      notification update {
+        description "Notifies clients about installation progress.";
+
+        leaf message {
+          description "Progress status.";
+          type string;
+        }
+
+        leaf progress {
+          description "Progress of the installation in percents.";
+
+          type int8 {
+            range "0 .. 100";
+          }
+        }
+      }
+
+      action install {
+        nacm:default-deny-all;
+        input {
+          leaf url {
+            description "URL or path to the new firmware.";
+            type string;
+            mandatory true;
+          }
+        }
+      }
+    }
+  }
+
+  typedef username-type {
+    type string {
+      pattern "[a-z][a-z0-9-]{0,30}";
+    }
+  }
+
+  typedef password-type {
+    type string {
+      pattern "[^\\r\\n]*";
+    }
+  }
+
+  grouping authentication-rpc-result {
+    leaf result {
+      mandatory true;
+      type enumeration {
+        enum success;
+        enum failure;
+      }
+    }
+
+    leaf message {
+      description "Can be used to supply and error message.";
+      type string;
+    }
+  }
+
+  typedef authorized-key-format {
+    description "Pubkey in the authorized_keys format for sshd.";
+    type string;
+  }
+
+
+  container authentication {
+    list users {
+      config false;
+      key 'name';
+
+      leaf name {
+        type username-type;
+      }
+
+      leaf password-last-change {
+        type string;
+      }
+
+      list authorized-keys {
+        key 'index';
+        leaf index {
+          type int32;
+        }
+
+        leaf public-key {
+          mandatory true;
+          type authorized-key-format;
+        }
+
+        action remove {
+          output {
+            uses authentication-rpc-result;
+          }
+        }
+      }
+
+      action change-password {
+        nacm:default-deny-all;
+        input {
+          leaf password-cleartext {
+            mandatory true;
+            description "This is supposed to be a plaintext password. Make sure it's not logged anywhere.";
+            type password-type;
+          }
+        }
+
+        output {
+          uses authentication-rpc-result;
+        }
+      }
+
+      action add-authorized-key {
+        nacm:default-deny-all;
+        input {
+          leaf key {
+            mandatory true;
+            type authorized-key-format;
+          }
+        }
+
+        output {
+          uses authentication-rpc-result;
+        }
+      }
+    }
+  }
+
+  container leds {
+    config false;
+    description "Current status of LEDs.";
+
+    list led {
+      key 'name';
+
+      leaf name {
+        type string;
+        description "Name of the LED";
+      }
+
+      leaf brightness {
+        mandatory true;
+        description "Current brightness of the LED in percents of the maximal possible brightness of the LED.";
+        type percent;
+      }
+    }
+
+    action uid {
+      input {
+        leaf state {
+          mandatory true;
+          description "Change state of the UID led (turn off, on, or keep blinking).";
+          type enumeration {
+            enum off;
+            enum on;
+            enum blinking;
+          }
+        }
+      }
+    }
+  }
+
+  deviation /sys:system-shutdown { deviate not-supported; }
+  deviation /sys:system/sys:dns-resolver { deviate add { config false; } }
+}

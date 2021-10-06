@@ -1,0 +1,81 @@
+module czechlight-calibration-device {
+
+  namespace
+    "http://czechlight.cesnet.cz/yang/calibration-device";
+
+  prefix "czechlight-calibration-device";
+
+  organization "CESNET";
+  contact "photonic@cesnet.cz";
+  description "Measurement and Calibration device";
+
+  revision 2019-06-25 {
+    description "Initial release";
+  }
+
+  typedef port-number {
+    type uint8 {
+      range "1..36";
+    }
+    description "Port number";
+  }
+
+  typedef frequency-mhz {
+    type uint32 {
+      range "191500000..196250000";
+    }
+    units MHz;
+    description "Laser frequency in MHz";
+  }
+
+  typedef power-dbm {
+    type decimal64 {
+      fraction-digits 2;
+        range "-100.00..10.00";
+    }
+    units dBm;
+    description "Optical power in dBm";
+  }
+
+  container signal-source {
+    presence "Enable device";
+    description "Set frequency and power for signal to specific port";
+
+    leaf port {
+      type port-number;
+      mandatory true;
+      description "Active port through which signal will be transmitted";
+    }
+    leaf frequency {
+      type frequency-mhz;
+      mandatory true;
+      description "Frequency of the signal";
+    }
+    leaf power {
+      type power-dbm {
+        range "-14.00..-9.00";
+      }
+      mandatory true;
+      description "Transmission power";
+    }
+  }
+
+  rpc measure {
+    description "Get measuring values at specific port";
+
+    input {
+      leaf port {
+          type port-number;
+          mandatory true;
+          description "Port at which power will be measured";
+      }
+    }
+    output {
+      leaf power {
+        type power-dbm;
+        mandatory true;
+        description "Measured power";
+      }
+    }
+  }
+}
