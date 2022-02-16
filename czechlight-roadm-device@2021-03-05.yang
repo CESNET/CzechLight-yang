@@ -269,13 +269,13 @@ module czechlight-roadm-device {
       error-message "Minimal channel width for routed MCs is 50GHz";
     }
 
-    /*must "count(/media-channels[
+    must "count(/media-channels[
           deref(channel)/../lower-frequency >= deref(current()/channel)/../lower-frequency
           and deref(channel)/../lower-frequency < deref(current()/channel)/../upper-frequency
           and ((count(add) > 0 and count(current()/add) > 0) or ((count(drop) > 0 and count(current()/drop) > 0)))
           ]) <= 1" {
       error-message "This channel overlaps with another one on a different port";
-    }*/
+    }
   }
 
   container aggregate-power {

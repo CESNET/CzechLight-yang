@@ -53,7 +53,7 @@ module czechlight-roadm-common {
     type decimal64 {
       fraction-digits 1;
     }
-    units dBm;
+    units dB;
   }
 
   grouping power-control {
