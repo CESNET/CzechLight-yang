@@ -157,7 +157,7 @@ module czechlight-roadm-common {
       description "Each subsequent `p` result is this far from the previous one.";
     }
 
-    anydata p {
+    anyxml p {
       config false;
       description "Measured power. Sorted by frequency, starting at `lowest-frequency`, step size `step`. Individual items are decimal64 numbers.";
     }
