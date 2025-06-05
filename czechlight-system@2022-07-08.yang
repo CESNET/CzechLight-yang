@@ -1,0 +1,346 @@
+module czechlight-system {
+  yang-version 1.1;
+  namespace
+    "http://czechlight.cesnet.cz/yang/czechlight-system";
+
+  prefix "cla-sys";
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  import ietf-netconf-acm {
+    prefix nacm;
+  }
+
+  import ietf-system {
+    prefix "sys";
+  }
+
+  import ietf-hardware {
+    prefix "hw";
+  }
+
+  organization "CESNET";
+  contact "photonic@cesnet.cz";
+  description
+    "YANG model for system administration in Czechlight devices.";
+
+  revision 2021-01-13 {
+    description "Initial release";
+  }
+
+  revision 2022-07-08 {
+    description "Extended firmware slot properties and actions";
+  }
+
+  typedef percent {
+    type uint8 {
+      range "0 .. 100";
+    }
+  }
+
+  container firmware {
+    config false;
+
+    list firmware-slot {
+      key name;
+
+      leaf name {
+        description "Identifier of the slot.";
+        type string;
+      }
+
+      leaf version {
+        description "Firmware version installed in the slot.";
+        type string;
+      }
+
+      leaf installed {
+        description "Datetime of the last installation performed in this slot.";
+        type yang:date-and-time;
+      }
+
+      leaf is-booted-now {
+        description "Is the system running from this slot?";
+        type boolean;
+      }
+
+      leaf is-healthy {
+        description "Only healthy slots are considered for booting. Slots which failed during a boot are marked as non-healthy.";
+        type boolean;
+      }
+
+      leaf will-boot-next {
+        description "Is this slot selected for booting after the next reboot?";
+        type boolean;
+      }
+
+      action set-active-after-reboot {
+        description "Schedule this slot for activation after the next reboot";
+      }
+
+      action set-unhealthy {
+        description "Mark this slot as having faulted during the last boot";
+      }
+    }
+
+    container installation {
+      leaf status {
+        description "Informs about the status of the current (or last) installation.";
+
+        type enumeration {
+          enum none;
+          enum in-progress;
+          enum succeeded;
+          enum failed;
+        }
+      }
+
+      leaf message {
+        description "The last message from the installation process. This MAY contain the last error message.";
+        type string;
+      }
+
+      notification update {
+        description "Notifies clients about installation progress.";
+
+        leaf message {
+          description "Progress status.";
+          type string;
+        }
+
+        leaf progress {
+          description "Progress of the installation in percents.";
+
+          type int8 {
+            range "0 .. 100";
+          }
+        }
+      }
+
+      action install {
+        nacm:default-deny-all;
+        description "Download and install a new firmware image to the inactive FW slot";
+        input {
+          leaf url {
+            description "URL or path to the new firmware.";
+            type string;
+            mandatory true;
+          }
+        }
+      }
+    }
+  }
+
+  typedef username-type {
+    type string {
+      pattern "[a-z][a-z0-9-]{0,30}";
+    }
+  }
+
+  typedef password-type {
+    type string {
+      pattern "[^\\r\\n]*";
+    }
+  }
+
+  grouping authentication-rpc-result {
+    leaf result {
+      mandatory true;
+      type enumeration {
+        enum success;
+        enum failure;
+      }
+    }
+
+    leaf message {
+      description "Can be used to supply and error message.";
+      type string;
+    }
+  }
+
+  typedef authorized-key-format {
+    description "Pubkey in the authorized_keys format for sshd.";
+    type string;
+  }
+
+
+  container authentication {
+    description "User management";
+    list users {
+      config false;
+      key 'name';
+      description "All user accounts which are configured in the Linux system";
+
+      leaf name {
+        type username-type;
+      }
+
+      leaf password-last-change {
+        nacm:default-deny-all;
+        type string;
+      }
+
+      list authorized-keys {
+        nacm:default-deny-all;
+        key 'index';
+        description "List of SSH keys which are recognized for this user";
+
+        leaf index {
+          type int32;
+        }
+
+        leaf public-key {
+          mandatory true;
+          type authorized-key-format;
+        }
+
+        action remove {
+          description "Remove the selected SSH authentication key of the selected user";
+          output {
+            uses authentication-rpc-result;
+          }
+        }
+      }
+
+      action change-password {
+        nacm:default-deny-all;
+        input {
+          leaf password-cleartext {
+            mandatory true;
+            description "This is supposed to be a plaintext password. Make sure it's not logged anywhere.";
+            type password-type;
+          }
+        }
+
+        output {
+          uses authentication-rpc-result;
+        }
+      }
+
+      action add-authorized-key {
+        nacm:default-deny-all;
+        description "Add a new SSH public key for authentication as the selected user";
+        input {
+          leaf key {
+            mandatory true;
+            type authorized-key-format;
+          }
+        }
+
+        output {
+          uses authentication-rpc-result;
+        }
+      }
+    }
+  }
+
+  container leds {
+    config false;
+    description "Current status of LEDs.";
+
+    list led {
+      key 'name';
+
+      leaf name {
+        type string;
+        description "Name of the LED";
+      }
+
+      leaf brightness {
+        mandatory true;
+        description "Current brightness of the LED in percents of the maximal possible brightness of the LED.";
+        type percent;
+      }
+    }
+
+    action uid {
+      input {
+        leaf state {
+          mandatory true;
+          description "Change state of the UID led (turn off, on, or keep blinking).";
+          type enumeration {
+            enum off;
+            enum on;
+            enum blinking;
+          }
+        }
+      }
+    }
+  }
+
+  container journal-upload {
+    presence "Enable systemd-journal-upload service";
+    description "Configures systemd-journal-upload.service. If the container is present,
+                 then systemd-journal-upload service is set up with the URL composed of
+                 the leafs in this container. See --url in
+                 https://www.freedesktop.org/software/systemd/man/252/systemd-journal-upload.service.html";
+
+    leaf protocol {
+      type enumeration {
+        enum "http";
+        enum "https";
+      }
+
+      default "https";
+      description "Sets the URL protocol. See --url in https://www.freedesktop.org/software/systemd/man/252/systemd-journal-upload.service.html";
+    }
+
+    leaf host {
+      mandatory true;
+      type inet:host;
+      description "Sets the host. See --url in https://www.freedesktop.org/software/systemd/man/252/systemd-journal-upload.service.html";
+    }
+
+    leaf port {
+      type inet:port-number;
+      default "19532";
+      description "Sets the port. See --url in https://www.freedesktop.org/software/systemd/man/252/systemd-journal-upload.service.html";
+    }
+  }
+
+  deviation /sys:system-shutdown {
+    deviate not-supported;
+  }
+
+  deviation /sys:system/sys:dns-resolver {
+    deviate add {
+      config false;
+    }
+  }
+
+  deviation /hw:hardware/hw:component/hw:parent {
+    deviate add {
+      config false;
+    }
+  }
+
+  deviation /hw:hardware/hw:component/hw:parent-rel-pos {
+    deviate not-supported;
+  }
+
+  deviation /hw:hardware/hw:component/hw:uri {
+    deviate not-supported;
+  }
+
+  deviation /hw:hardware/hw:component/hw:state {
+    deviate add {
+      config false;
+    }
+  }
+
+  deviation /hw:hardware/hw:component {
+    deviate add {
+      must "(name = 'ne') and (class = 'iana-hardware:chassis')" {
+        error-message "Only asset-id is configurable, and only for /ietf-hardware:hardware/component[name='ne'],
+        which must be of the iana-hardware:chassis class. Other hardware entities will appear exclusively in the
+        `operational` datastore. These components do not support any configuration.";
+      }
+    }
+  }
+}

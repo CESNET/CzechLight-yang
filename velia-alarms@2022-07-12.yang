@@ -1,0 +1,53 @@
+module velia-alarms {
+    yang-version 1.1;
+    namespace "http://czechlight.cesnet.cz/yang/velia-alarms";
+    prefix ve-al;
+
+    import ietf-alarms {
+        prefix al;
+    }
+
+    revision 2022-07-12 {
+        description
+          "Initial version.";
+    }
+
+    identity velia-alarm {
+        base al:alarm-type-id;
+    }
+
+    identity systemd-unit-failure {
+        base velia-alarm;
+    }
+
+    identity sensor-alarm {
+        base velia-alarm;
+        description "Abstract base for hardware sensor related alarms.";
+    }
+
+    identity sensor-missing-alarm {
+        base sensor-alarm;
+        description "Alarm to model that sensor is missing.";
+    }
+
+    identity sensor-nonoperational {
+        base sensor-alarm;
+        description "Sensor is set as nonoperational.";
+    }
+
+    identity sensor-threshold-crossing-alarm {
+        base sensor-alarm;
+        description "Abstract base for sensor threshold crossing.";
+    }
+
+    identity sensor-low-value-alarm {
+        base sensor-threshold-crossing-alarm;
+        description "Sensor value is too low.";
+    }
+
+    identity sensor-high-value-alarm {
+        base sensor-threshold-crossing-alarm;
+        description "Sensor value is too high.";
+    }
+}
+

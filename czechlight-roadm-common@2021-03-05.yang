@@ -163,4 +163,21 @@ module czechlight-roadm-common {
     }
   }
 
+  typedef spectral-scan-frequency {
+    type union {
+      type uint16 {
+        range "1..3600";
+      }
+      type enumeration {
+        enum as-often-as-hw-allows {
+          description "Scan as frequently as the HW allows.
+
+          This might slow down the power control loop and affect latency.";
+        }
+      }
+    }
+    description "How often to perform the full spectrum scan";
+    units "s";
+  }
+
 }

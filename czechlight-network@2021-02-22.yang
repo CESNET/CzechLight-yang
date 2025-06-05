@@ -54,21 +54,28 @@ module czechlight-network {
     // User should not create new links or reconfigure link types
     deviation /if:interfaces/if:interface/if:name {
         deviate add {
-            must '. = "br0" or . = "eth0" or . = "eth1" or . = "osc" or . = "oscW" or . = "oscE"' {
-                error-message "Link name must be chosen from the following options: {br0, eth0, eth1, osc, oscW, oscE}.";
+            must '. = "br0" or . = "eth0" or . = "eth1" or . = "eth2" or . = "osc" or . = "oscW" or . = "oscE" or . = "sfp3"' {
+                error-message "Link name must be chosen from the following options: {br0, eth0, eth1, osc, oscW, oscE, sfp3}.";
             }
         }
     }
 
     deviation /if:interfaces/if:interface/if:type {
         deviate add {
-            must '(../if:name = "br0" and . = "ianaift:bridge") or
-                  (../if:name = "eth0" and . = "ianaift:ethernetCsmacd") or
-                  (../if:name = "eth1" and . = "ianaift:ethernetCsmacd") or
-                  (../if:name = "osc" and . = "ianaift:ethernetCsmacd") or
-                  (../if:name = "oscW" and . = "ianaift:ethernetCsmacd") or
-                  (../if:name = "oscE" and . = "ianaift:ethernetCsmacd")' {
-                error-message "Link type can't be reconfigured.";
+            must 'not(re-match(../if:name, "br\d+")) or . = "ianaift:bridge"' {
+                error-message "The if:type of a 'br*' interface must be set to ianaift:bridge";
+            }
+
+            must 'not(re-match(../if:name, "eth\d+")) or . = "ianaift:ethernetCsmacd"' {
+                error-message "The if:type of a 'eth*' interface must be set to ianaift:ethernetCsmacd";
+            }
+
+            must 'not(re-match(../if:name, "osc.*")) or . = "ianaift:ethernetCsmacd"' {
+                error-message "The if:type of a 'osc*' interface must be set to ianaift:ethernetCsmacd";
+            }
+
+            must 'not(re-match(../if:name, "sfp.*")) or . = "ianaift:ethernetCsmacd"' {
+                error-message "The if:type of a 'sfp*' interface must be set to ianaift:ethernetCsmacd";
             }
         }
     }
@@ -77,13 +84,17 @@ module czechlight-network {
         description "Add the option to add this link to a bridge.";
 
         leaf bridge {
-            must '. = "br0"' {
-                error-message "br0 is the only available bridge interface.";
+            must '../if:type = "ianaift:ethernetCsmacd"' {
+                error-message "Only ethernet interfaces can be enslaved to a bridge.";
             }
 
-            when '(not(../ip:ipv4) or ../ip:ipv4/ip:enabled[.="false"]) and
+            must '/if:interfaces/if:interface[if:name = current()]/if:type = "ianaift:bridge"' {
+                error-message "An interface can be only enslaved to a bridge";
+            }
+
+            must '(not(../ip:ipv4) or ../ip:ipv4/ip:enabled[.="false"]) and
                   (not(../ip:ipv6) or ../ip:ipv6/ip:enabled[.="false"])' {
-                description "IP protocols must be disabled for enslaved link.";
+                error-message "IP protocols must be disabled for enslaved link.";
             }
 
             type if:interface-ref;
@@ -101,8 +112,16 @@ module czechlight-network {
                   cla-network:bridge' {
                 error-message "Enabled interface must always have at least one protocol active or it must be connected in the bridge.";
             }
-		}
-	}
+        }
+
+        deviate add {
+            must 'if:type != "ianaift:bridge" or
+                  (if:enabled != "true") or
+                  (count(../if:interface[(if:enabled = "true") and (cla-network:bridge = current()/name)]) > 0)' {
+                error-message "All enabled bridges must have at least one enabled enslaved interface";
+            }
+        }
+    }
 
     augment /if:interfaces/if:interface/ip:ipv4 {
         description "Add the IPv4 autoconfiguration option (DHCP client).";

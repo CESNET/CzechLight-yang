@@ -1,0 +1,179 @@
+module czechlight-bidi-amp {
+  yang-version 1.1;
+  namespace
+    "http://czechlight.cesnet.cz/yang/czechlight-inline-amp";
+
+  prefix "cla-bidi";
+
+  import czechlight-roadm-common {
+    prefix "cla-common";
+    revision-date 2021-03-05;
+  }
+
+  import opendevice-types {
+    prefix "odt";
+    revision-date 2017-10-08;
+  }
+
+  organization "CESNET";
+  contact "photonic@cesnet.cz";
+  description "Inline Amplifier";
+
+  revision 2025-05-22 {
+    description "Added support for AGC mode";
+  }
+
+  revision 2022-03-22 {
+    description "Initial release";
+  }
+
+  feature dualband-c-plus-1572 {
+    description "This device contains two bidi modules, one for an C-band and the second one for a narrowband around 1572nm";
+  }
+
+  feature dualband-l-plus-1590 {
+    description "This device contains two bidi modules, one for an L-band and the second one for a narrowband around 1590nm";
+  }
+
+  feature c-band-ocm {
+    description "This device contains an Optical Channel Monitor (OSC) operating at the C-band";
+  }
+
+  typedef laser-current-mA {
+    description "Electric current for the pumping laser";
+    type decimal64 {
+      fraction-digits 1;
+      range 0..1000.0;
+    }
+    units mA;
+  }
+
+  typedef gain-dB {
+    description "Gain in dB";
+    type decimal64 {
+      fraction-digits 1;
+      range 0..40.0;
+    }
+    units dB;
+  }
+
+  grouping optical-measurements-one-direction {
+    leaf input-power {
+      description "Input optical power";
+      type odt:optical-power-dBm;
+      mandatory true;
+    }
+
+    leaf output-power {
+      description "Output optical power";
+      type odt:optical-power-dBm;
+      mandatory true;
+    }
+  }
+
+  grouping bidi-amplifier {
+    description "Configuration of the bidirectional amplifier";
+
+    container pump {
+      description "Laser pump";
+
+      choice control {
+        description "Define how the pump is controlled";
+        default disabled;
+
+        leaf disabled {
+          description "Pump laser is switched off";
+          type empty;
+          default "";
+        }
+
+        leaf agc {
+          description "Automatic Gain Control (AGC) regulates the pump current automatically";
+          type gain-dB;
+          mandatory true;
+        }
+
+        leaf manual-current {
+          description "Manual set point of the desired laser pump current";
+          type laser-current-mA;
+          mandatory true;
+        }
+      }
+
+      leaf measured-current {
+        config false;
+        type laser-current-mA;
+        description "Actual, measured current through the pumping laser";
+      }
+    }
+
+    container east-to-west {
+      uses optical-measurements-one-direction;
+      config false;
+    }
+    container west-to-east {
+      uses optical-measurements-one-direction;
+      config false;
+    }
+  }
+
+  container c-band {
+    description "Amplifier for the C-band (1540-1547nm)";
+    if-feature dualband-c-plus-1572;
+    uses bidi-amplifier {
+      augment 'east-to-west' {
+        if-feature c-band-ocm;
+        container output-spectrum {
+          description "Spectrum scan at the output of the westward direction";
+          uses cla-common:spectral-scan-result;
+        }
+      }
+
+      augment 'west-to-east' {
+        if-feature c-band-ocm;
+        container output-spectrum {
+          description "Spectrum scan at the output of the eastward direction";
+          uses cla-common:spectral-scan-result;
+        }
+      }
+    }
+    leaf ocm-period {
+      if-feature c-band-ocm;
+      type cla-common:spectral-scan-frequency;
+    }
+
+    must "count(pump/manual-current) = 0 or pump/manual-current <= 300.0" {
+      error-message "Pump current at the C-band cannot exceed 300 mA";
+    }
+
+    must "count(pump/agc) = 0 or (pump/agc >= 22.0 and pump/agc <= 24.0)" {
+      error-message "In the AGC mode, target gain at the C-band must be set between 22.0 and 24.0 dB";
+    }
+  }
+
+  container l-band {
+    description "Amplifier for the L-band (1600-1611nm)";
+    if-feature dualband-l-plus-1590;
+    uses bidi-amplifier;
+  }
+
+  container narrow-1572 {
+    description "Amplifier for annorwband around 1572nm";
+    if-feature dualband-c-plus-1572;
+    uses bidi-amplifier;
+
+    must "count(pump/manual-current) = 0 or pump/manual-current <= 600.0" {
+      error-message "Pump current at the 1572nm cannot exceed 600 mA";
+    }
+
+    must "count(pump/agc) = 0 or (pump/agc >= 22.0 and pump/agc <= 24.0)" {
+      error-message "In the AGC mode, target gain at the 1572nm must be set between 22.0 and 24.0 dB";
+    }
+  }
+
+  container narrow-1590 {
+    description "Amplifier for narrowband around 1590nm";
+    if-feature dualband-l-plus-1590;
+    uses bidi-amplifier;
+  }
+}

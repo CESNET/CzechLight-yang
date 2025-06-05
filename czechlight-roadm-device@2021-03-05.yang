@@ -346,21 +346,8 @@ module czechlight-roadm-device {
     presence "If present, activates periodic spectrum scanning";
 
     leaf period {
-      type union {
-        type uint16 {
-          range "1..3600";
-        }
-        type enumeration {
-          enum as-often-as-hw-allows {
-            description "Scan as frequently as the HW allows.
-
-            This might slow down the power control loop and affect latency.";
-          }
-        }
-      }
+      type cla-common:spectral-scan-frequency;
       mandatory true;
-      description "How often to perform the full spectrum scan";
-      units "s";
     }
 
     leaf pin-source {
